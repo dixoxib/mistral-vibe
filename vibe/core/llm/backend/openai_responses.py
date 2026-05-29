@@ -537,6 +537,7 @@ class OpenAIResponsesAdapter(APIAdapter):
         provider: ProviderConfig,
         api_key: str | None = None,
         thinking: str = "off",
+        prune_idx: int | None = None,
     ) -> PreparedRequest:
         input_items = self._convert_messages(messages)
 

@@ -346,6 +346,7 @@ class LLMUsage(BaseModel):
     completion_tokens: int = 0
     cache_hit_tokens: int = 0
     cache_miss_tokens: int = 0
+    total_tokens: int = 0
 
     def __add__(self, other: LLMUsage) -> LLMUsage:
         return LLMUsage(
@@ -353,6 +354,7 @@ class LLMUsage(BaseModel):
             completion_tokens=self.completion_tokens + other.completion_tokens,
             cache_hit_tokens=self.cache_hit_tokens + other.cache_hit_tokens,
             cache_miss_tokens=self.cache_miss_tokens + other.cache_miss_tokens,
+            total_tokens=self.total_tokens + other.total_tokens,
         )
 
 

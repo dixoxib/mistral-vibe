@@ -24,7 +24,7 @@ __all__ = ["TeleportError", "run_programmatic"]
 _DEFAULT_CLIENT_METADATA = ClientMetadata(name="vibe_programmatic", version=__version__)
 
 
-def run_programmatic(  # noqa: PLR0913, PLR0917
+def run_programmatic(  # noqa: PLR0917
     config: VibeConfig,
     prompt: str,
     max_turns: int | None = None,

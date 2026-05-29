@@ -28,6 +28,8 @@ if TYPE_CHECKING:
     from vibe.core.config import ModelConfig, ProviderConfig
 
 
+SEAM_MARKER = "## Context Seam"
+
 class OpenAIAdapter(APIAdapter):
     endpoint: ClassVar[str] = "/chat/completions"
 
@@ -90,10 +92,11 @@ class OpenAIAdapter(APIAdapter):
         provider: ProviderConfig,
         api_key: str | None = None,
         thinking: str = "off",
+        prune_idx: int | None = None,
     ) -> PreparedRequest:
         field_name = provider.reasoning_field_name
         converted_messages = []
-        for msg in messages:
+        for i, msg in enumerate(messages):
             dumped = msg.model_dump(
                 exclude_none=True,
                 exclude={
@@ -106,6 +109,9 @@ class OpenAIAdapter(APIAdapter):
             # DeepSeek requires reasoning_content on EVERY assistant message (even empty)
             if msg.role == "assistant" and "reasoning_content" not in dumped:
                 dumped["reasoning_content"] = ""
+            if prune_idx is not None and i < prune_idx and msg.role == "tool":
+                name = dumped.get("name", "tool")
+                dumped["content"] = f"[tool result for {name} pruned]"
             converted_messages.append(self._reasoning_to_api(dumped, field_name))
 
         payload = self.build_payload(
@@ -123,6 +129,8 @@ class OpenAIAdapter(APIAdapter):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
 
         return PreparedRequest(self.endpoint, headers, body)
+
+
 
     def _parse_message(
         self, data: dict[str, Any], field_name: str
@@ -159,6 +167,7 @@ class OpenAIAdapter(APIAdapter):
             completion_tokens=usage_data.get("completion_tokens", 0),
             cache_hit_tokens=usage_data.get("prompt_cache_hit_tokens", 0),
             cache_miss_tokens=usage_data.get("prompt_cache_miss_tokens", 0),
+            total_tokens=usage_data.get("total_tokens", 0),
         )
 
         return LLMChunk(message=message, usage=usage)
@@ -202,6 +211,33 @@ class GenericBackend:
         self._owns_client = client is None
         self._provider = provider
         self._timeout = timeout
+
+    def _compute_prune_idx(
+        self, messages: Sequence[LLMMessage], model: ModelConfig
+    ) -> int | None:
+        if model.seam_prune_margin <= 0 or model.seam_interval <= 0:
+            return None
+
+        seam_indices: list[int] = []
+        for i, msg in enumerate(messages):
+            content = msg.content or ""
+            if msg.role == "user" and content.startswith(SEAM_MARKER):
+                seam_indices.append(i)
+
+        if not seam_indices:
+            return None
+
+        total_chars = sum(len(m.content or "") for m in messages)
+        cutoff_chars = total_chars - model.seam_prune_margin * 4
+
+        for seam_idx in reversed(seam_indices):
+            seam_chars = sum(
+                len(m.content or "") for m in messages[: seam_idx + 1]
+            )
+            if seam_chars < cutoff_chars:
+                return seam_idx
+
+        return None
 
     async def __aenter__(self) -> GenericBackend:
         if self._client is None:
@@ -252,11 +288,13 @@ class GenericBackend:
 
         api_style = getattr(self._provider, "api_style", "openai")
         adapter = _get_adapter(api_style)
+        prune_idx = self._compute_prune_idx(messages, model)
 
         req = adapter.prepare_request(
             model_name=model.name,
             messages=messages,
             temperature=temperature,
+            prune_idx=prune_idx,
             tools=tools,
             max_tokens=max_tokens,
             tool_choice=tool_choice,
@@ -320,6 +358,7 @@ class GenericBackend:
 
         api_style = getattr(self._provider, "api_style", "openai")
         adapter = _get_adapter(api_style)
+        prune_idx = self._compute_prune_idx(messages, model)
 
         req = adapter.prepare_request(
             model_name=model.name,
@@ -329,6 +368,7 @@ class GenericBackend:
             max_tokens=max_tokens,
             tool_choice=tool_choice,
             enable_streaming=True,
+            prune_idx=prune_idx,
             provider=self._provider,
             api_key=api_key,
             thinking=model.thinking,

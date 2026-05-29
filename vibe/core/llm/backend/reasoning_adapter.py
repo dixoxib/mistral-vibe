@@ -119,6 +119,7 @@ class ReasoningAdapter(APIAdapter):
         provider: ProviderConfig,
         api_key: str | None = None,
         thinking: str = "off",
+        prune_idx: int | None = None,
     ) -> PreparedRequest:
         converted_messages = [self._convert_message(msg) for msg in messages]
 

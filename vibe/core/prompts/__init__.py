@@ -31,6 +31,7 @@ class SystemPrompt(Prompt):
 class UtilityPrompt(Prompt):
     AGENTS_DOC = auto()
     COMPACT = auto()
+    SEAM = auto()
     COMPACT_SUMMARY_PREFIX = auto()
     DANGEROUS_DIRECTORY = auto()
     PROJECT_CONTEXT = auto()

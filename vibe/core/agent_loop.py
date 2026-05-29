@@ -231,7 +231,7 @@ def requires_init(fn: Callable[..., Any]) -> Callable[..., Any]:
 
 
 class AgentLoop:  # noqa: PLR0904
-    def __init__(  # noqa: PLR0913, PLR0915
+    def __init__(  # noqa: PLR0915
         self,
         config: VibeConfig,
         *,
@@ -334,6 +334,7 @@ class AgentLoop:  # noqa: PLR0904
         self._current_user_message_id: str | None = None
         self._is_user_prompt_call: bool = False
         self._pending_injected_messages: list[LLMMessage] = []
+        self._last_seam_chars: int = 0
 
         self.experiment_manager = ExperimentManager(
             client=RemoteEvalClient.from_settings(
@@ -612,6 +613,23 @@ class AgentLoop:  # noqa: PLR0904
             experiment_manager=self.experiment_manager,
         )
         self.messages.update_system_prompt(system_prompt)
+
+    async def _inject_seam_if_needed(self) -> None:
+        model = self.config.get_active_model()
+        if model.seam_interval <= 0:
+            return
+
+        current_chars = sum(len(m.content or "") for m in self.messages)
+        if current_chars - self._last_seam_chars < model.seam_interval * 4:
+            return
+
+        from vibe.core.prompts import UtilityPrompt
+
+        seam_prompt = UtilityPrompt.SEAM.read()
+        self.messages.append(
+            LLMMessage(role=Role.user, content=seam_prompt, injected=True)
+        )
+        self._last_seam_chars = current_chars
 
     def _select_backend(self) -> BackendLike:
         provider = self.config.get_active_provider()
@@ -1344,6 +1362,7 @@ class AgentLoop:  # noqa: PLR0904
         )
 
         try:
+            await self._inject_seam_if_needed()
             start_time = time.perf_counter()
             result = await self.backend.complete(
                 model=active_model,
@@ -1407,6 +1426,7 @@ class AgentLoop:  # noqa: PLR0904
         )
 
         try:
+            await self._inject_seam_if_needed()
             start_time = time.perf_counter()
             usage = LLMUsage()
             chunk_agg: LLMChunk | None = None
@@ -1465,7 +1485,7 @@ class AgentLoop:  # noqa: PLR0904
         self.stats.session_completion_tokens += usage.completion_tokens
         self.stats.session_cache_hit_tokens += usage.cache_hit_tokens
         self.stats.session_cache_miss_tokens += usage.cache_miss_tokens
-        self.stats.context_tokens = usage.prompt_tokens + usage.completion_tokens
+        self.stats.context_tokens = usage.prompt_tokens
         if time_seconds > 0 and usage.completion_tokens > 0:
             self.stats.tokens_per_second = usage.completion_tokens / time_seconds
 
