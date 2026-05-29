@@ -94,21 +94,21 @@ class OpenAIAdapter(APIAdapter):
         thinking: str = "off",
     ) -> PreparedRequest:
         field_name = provider.reasoning_field_name
-        converted_messages = [
-            self._reasoning_to_api(
-                msg.model_dump(
-                    exclude_none=True,
-                    exclude={
-                        "message_id",
-                        "reasoning_message_id",
-                        "reasoning_state",
-                        "injected",
-                    },
-                ),
-                field_name,
+        converted_messages = []
+        for msg in messages:
+            dumped = msg.model_dump(
+                exclude_none=True,
+                exclude={
+                    "message_id",
+                    "reasoning_message_id",
+                    "reasoning_state",
+                    "injected",
+                },
             )
-            for msg in messages
-        ]
+            # DeepSeek requires reasoning_content on EVERY assistant message (even empty)
+            if msg.role == "assistant" and "reasoning_content" not in dumped:
+                dumped["reasoning_content"] = ""
+            converted_messages.append(self._reasoning_to_api(dumped, field_name))
 
         payload = self.build_payload(
             model_name, converted_messages, temperature, tools, max_tokens, tool_choice
