@@ -95,6 +95,7 @@ class OpenAIAdapter(APIAdapter):
         prune_idx: int | None = None,
     ) -> PreparedRequest:
         field_name = provider.reasoning_field_name
+
         converted_messages = []
         for i, msg in enumerate(messages):
             dumped = msg.model_dump(
