@@ -204,12 +204,15 @@ class ReasoningMessage(SpinnerMixin, StreamingMessageBase):
     SPINNING_TEXT = "Thinking"
     COMPLETED_TEXT = "Thought"
 
-    def __init__(self, content: str, collapsed: bool = True) -> None:
+    def __init__(
+        self, content: str, collapsed: bool = True, is_complete: bool = False
+    ) -> None:
         super().__init__(content)
         self.add_class("reasoning-message")
         self.collapsed = collapsed
         self._indicator_widget: Static | None = None
         self._triangle_widget: Static | None = None
+        self._is_complete = is_complete
         self.init_spinner()
 
     def compose(self) -> ComposeResult:
@@ -233,7 +236,10 @@ class ReasoningMessage(SpinnerMixin, StreamingMessageBase):
             yield markdown
 
     def on_mount(self) -> None:
-        self.start_spinner_timer()
+        if self._is_complete:
+            self.stop_spinning()
+        else:
+            self.start_spinner_timer()
 
     def on_resize(self) -> None:
         self.refresh_spinner()

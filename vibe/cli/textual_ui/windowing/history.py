@@ -54,6 +54,13 @@ def build_history_widgets(
                     history_widget_indices[widget] = history_index
 
             case Role.assistant:
+                if msg.reasoning_content:
+                    reasoning_widget = ReasoningMessage(
+                        msg.reasoning_content, collapsed=False, is_complete=True
+                    )
+                    widgets.append(reasoning_widget)
+                    history_widget_indices[reasoning_widget] = history_index
+
                 if msg.content:
                     assistant_widget = AssistantMessage(msg.content)
                     widgets.append(assistant_widget)

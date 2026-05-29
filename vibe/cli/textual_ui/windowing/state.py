@@ -7,7 +7,7 @@ from textual.widget import Widget
 from vibe.cli.textual_ui.widgets.load_more import HistoryLoadMoreMessage
 from vibe.core.types import LLMMessage
 
-HISTORY_RESUME_TAIL_MESSAGES = 20
+HISTORY_RESUME_TAIL_MESSAGES = 50
 LOAD_MORE_BATCH_SIZE = 10
 
 
