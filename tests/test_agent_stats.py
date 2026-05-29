@@ -155,11 +155,9 @@ class TestAgentStatsHelpers:
             input_price_per_million=1.0,
             output_price_per_million=2.0,
         )
-        # Cost = 1M * $1/M + 0.5M * $2/M = $1 + $1 = $2
         assert stats.session_cost == 2.0
 
         stats.update_pricing(2.0, 4.0)
-        # Cost = 1M * $2/M + 0.5M * $4/M = $2 + $2 = $4
         assert stats.session_cost == 4.0
 
 
@@ -663,26 +661,25 @@ class TestClearHistoryObserverBugfix:
 
 class TestStatsEdgeCases:
     @pytest.mark.asyncio
-    async def test_session_cost_approximation_on_model_change(
-        self, monkeypatch
-    ) -> None:
+    async def test_session_cost_accumulates_across_turns(self, monkeypatch) -> None:
         monkeypatch.setenv("LECHAT_API_KEY", "mock-key")
 
         backend = FakeBackend(mock_llm_chunk(content="Response"))
-        config1 = make_config(active_model="devstral-latest")
-        agent = build_test_agent_loop(config=config1, backend=backend)
+        config = make_config(active_model="devstral-latest")
+        agent = build_test_agent_loop(config=config, backend=backend)
+
+        assert agent.stats.accumulated_cost == 0.0
 
         async for _ in agent.act("Hello"):
             pass
 
-        cost_before = agent.stats.session_cost
+        cost_after_first = agent.stats.accumulated_cost
+        assert cost_after_first > 0
 
-        config2 = make_config(active_model="strawberry")
-        await agent.reload_with_initial_messages(base_config=config2)
+        async for _ in agent.act("Again"):
+            pass
 
-        cost_after = agent.stats.session_cost
-
-        assert cost_after > cost_before
+        assert agent.stats.accumulated_cost > cost_after_first
 
     @pytest.mark.asyncio
     async def test_multiple_reloads_accumulate_correctly(self) -> None:

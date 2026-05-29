@@ -1459,11 +1459,29 @@ class AgentLoop:  # noqa: PLR0904
         self.stats.last_turn_duration = time_seconds
         self.stats.last_turn_prompt_tokens = usage.prompt_tokens
         self.stats.last_turn_completion_tokens = usage.completion_tokens
+        self.stats.last_turn_cache_hit_tokens = usage.cache_hit_tokens
+        self.stats.last_turn_cache_miss_tokens = usage.cache_miss_tokens
         self.stats.session_prompt_tokens += usage.prompt_tokens
         self.stats.session_completion_tokens += usage.completion_tokens
+        self.stats.session_cache_hit_tokens += usage.cache_hit_tokens
+        self.stats.session_cache_miss_tokens += usage.cache_miss_tokens
         self.stats.context_tokens = usage.prompt_tokens + usage.completion_tokens
         if time_seconds > 0 and usage.completion_tokens > 0:
             self.stats.tokens_per_second = usage.completion_tokens / time_seconds
+
+        model = self.config.get_active_model()
+        cache_hit_price = (
+            model.cache_hit_price
+            if model.cache_hit_price > 0
+            else model.input_price * 0.25
+        )
+        cost = (
+            usage.cache_miss_tokens * model.input_price
+            + usage.cache_hit_tokens * cache_hit_price
+            + usage.completion_tokens * model.output_price
+        ) / 1_000_000
+        self.stats.last_turn_cost = cost
+        self.stats.accumulated_cost += cost
 
     async def _should_execute_tool(
         self, tool: BaseTool, args: BaseModel, tool_call_id: str

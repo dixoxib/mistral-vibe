@@ -57,6 +57,13 @@ class AgentStats(BaseModel):
 
     last_turn_prompt_tokens: int = 0
     last_turn_completion_tokens: int = 0
+    last_turn_cache_hit_tokens: int = 0
+    last_turn_cache_miss_tokens: int = 0
+    last_turn_cost: float = 0.0
+
+    session_cache_hit_tokens: int = 0
+    session_cache_miss_tokens: int = 0
+    accumulated_cost: float = 0.0
     last_turn_duration: float = 0.0
     tokens_per_second: float = 0.0
 
@@ -87,6 +94,14 @@ class AgentStats(BaseModel):
         fresh._listeners = previous._listeners.copy()
         return fresh
 
+    def restore_from_dict(self, data: dict[str, Any]) -> None:
+        listeners = self._listeners.copy()
+        for field_name in self.model_fields:
+            if field_name in data:
+                setattr(self, field_name, data[field_name])
+        self._listeners = listeners
+        self.trigger_listeners()
+
     @computed_field
     @property
     def session_total_llm_tokens(self) -> int:
@@ -100,12 +115,8 @@ class AgentStats(BaseModel):
     @computed_field
     @property
     def session_cost(self) -> float:
-        """Calculate the total session cost in dollars based on token usage and pricing.
-
-        NOTE: This is a rough estimate and is worst-case scenario.
-        The actual cost may be lower due to prompt caching.
-        If the model changes mid-session, this uses current pricing for all tokens.
-        """
+        if self.accumulated_cost:
+            return self.accumulated_cost
         input_cost = (
             self.session_prompt_tokens / 1_000_000
         ) * self.input_price_per_million
@@ -333,11 +344,15 @@ class LLMUsage(BaseModel):
     model_config = ConfigDict(frozen=True)
     prompt_tokens: int = 0
     completion_tokens: int = 0
+    cache_hit_tokens: int = 0
+    cache_miss_tokens: int = 0
 
     def __add__(self, other: LLMUsage) -> LLMUsage:
         return LLMUsage(
             prompt_tokens=self.prompt_tokens + other.prompt_tokens,
             completion_tokens=self.completion_tokens + other.completion_tokens,
+            cache_hit_tokens=self.cache_hit_tokens + other.cache_hit_tokens,
+            cache_miss_tokens=self.cache_miss_tokens + other.cache_miss_tokens,
         )
 
 

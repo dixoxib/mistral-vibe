@@ -157,6 +157,8 @@ class OpenAIAdapter(APIAdapter):
         usage = LLMUsage(
             prompt_tokens=usage_data.get("prompt_tokens", 0),
             completion_tokens=usage_data.get("completion_tokens", 0),
+            cache_hit_tokens=usage_data.get("prompt_cache_hit_tokens", 0),
+            cache_miss_tokens=usage_data.get("prompt_cache_miss_tokens", 0),
         )
 
         return LLMChunk(message=message, usage=usage)

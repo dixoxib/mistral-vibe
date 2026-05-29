@@ -90,7 +90,7 @@ async def test_ui_session_incremental_loader_shows_tail_and_load_more(
 async def test_ui_session_incremental_loader_load_more_shows_remaining_count(
     vibe_config: VibeConfig,
 ) -> None:
-    total_messages = 31
+    total_messages = 61
     agent_loop = build_test_agent_loop(config=vibe_config, enable_streaming=False)
     agent_loop.messages.extend([
         LLMMessage(role=Role.user, content=f"msg-{idx}")
@@ -125,7 +125,7 @@ async def test_ui_session_incremental_loader_load_more_batches_until_done(
 ) -> None:
     agent_loop = build_test_agent_loop(config=vibe_config, enable_streaming=False)
     agent_loop.messages.extend([
-        LLMMessage(role=Role.user, content=f"msg-{idx}") for idx in range(31)
+        LLMMessage(role=Role.user, content=f"msg-{idx}") for idx in range(61)
     ])
 
     app = VibeApp(agent_loop=agent_loop, plan_offer_gateway=_pro_plan_gateway())
@@ -138,7 +138,7 @@ async def test_ui_session_incremental_loader_load_more_batches_until_done(
         )
         await _wait_for_load_more(app, pilot.pause)
 
-        total_messages = 31
+        total_messages = 61
         while len(app.query(HistoryLoadMoreMessage)) == 1:
             current_count = len(app.query(UserMessage))
             app.post_message(HistoryLoadMoreRequested())
@@ -169,7 +169,7 @@ async def test_ui_session_incremental_loader_keeps_top_alignment_when_not_scroll
     # Each UserMessage renders as ~3 rows (top margin + content + separator);
     # add chrome (input box, banner, status) so all messages fit without scrolling.
     user_message_rows = 3
-    chrome_rows = 40
+    chrome_rows = 70
     viewport_height = (
         HISTORY_RESUME_TAIL_MESSAGES + 1
     ) * user_message_rows + chrome_rows

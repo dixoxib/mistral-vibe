@@ -367,8 +367,9 @@ class ModelConfig(BaseModel):
     provider: str
     alias: str
     temperature: float = 0.2
-    input_price: float = 0.0  # Price per million input tokens
+    input_price: float = 0.0  # Price per million input tokens (cache miss)
     output_price: float = 0.0  # Price per million output tokens
+    cache_hit_price: float = 0.0  # Price per million input tokens (cache hit)
     thinking: ThinkingLevel = "off"
     auto_compact_threshold: int = 200_000
 
@@ -468,8 +469,9 @@ DEFAULT_MODELS = [
         provider="deepseek",
         alias="deepseek",
         temperature=1.0,
-        input_price=0.27,
-        output_price=1.10,
+        input_price=0.435,
+        output_price=0.87,
+        cache_hit_price=0.003625,
         thinking="high",
         auto_compact_threshold=1_000_000,
     ),

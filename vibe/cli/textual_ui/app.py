@@ -61,7 +61,7 @@ from vibe.cli.textual_ui.widgets.chat_input.text_area import ChatTextArea
 from vibe.cli.textual_ui.widgets.compact import CompactMessage
 from vibe.cli.textual_ui.widgets.config_app import ConfigApp
 from vibe.cli.textual_ui.widgets.connector_auth_app import ConnectorAuthApp
-from vibe.cli.textual_ui.widgets.context_progress import ContextProgress, TokenState
+from vibe.cli.textual_ui.widgets.context_progress import ContextProgress
 from vibe.cli.textual_ui.widgets.debug_console import DebugConsole
 from vibe.cli.textual_ui.widgets.feedback_bar import FeedbackBar
 from vibe.cli.textual_ui.widgets.feedback_bar_manager import FeedbackBarManager
@@ -540,14 +540,14 @@ class VibeApp(App):  # noqa: PLR0904
 
         self._chat_input_container = self.query_one(ChatInputContainer)
         context_progress = self.query_one(ContextProgress)
+        context_progress.max_tokens = (
+            self.config.get_active_model().auto_compact_threshold
+        )
 
         def update_context_progress(stats: AgentStats) -> None:
-            context_progress.tokens = TokenState(
-                max_tokens=self.config.get_active_model().auto_compact_threshold,
-                current_tokens=stats.context_tokens,
-            )
+            context_progress.stats = stats
 
-        self.agent_loop.stats.add_listener("context_tokens", update_context_progress)
+        self.agent_loop.stats.add_listener("last_turn_cost", update_context_progress)
         self.agent_loop.stats.trigger_listeners()
 
         self.agent_loop.set_approval_callback(self._approval_callback)
@@ -1962,14 +1962,22 @@ class VibeApp(App):  # noqa: PLR0904
 
         self.agent_loop.session_id = session.session_id
         self.agent_loop.parent_session_id = metadata.get("parent_session_id")
+        if "stats" in metadata:
+            self.agent_loop.stats.restore_from_dict(metadata["stats"])
         self.agent_loop.session_logger.resume_existing_session(
             session.session_id, session_path
         )
         await self.agent_loop.hydrate_experiments_from_session()
-        current_system_messages = [
-            msg for msg in self.agent_loop.messages if msg.role == Role.system
-        ]
-        self.agent_loop.messages.reset(current_system_messages + non_system_messages)
+        if "system_prompt" in metadata:
+            saved_system = LLMMessage.model_validate(metadata["system_prompt"])
+            self.agent_loop.messages.reset([saved_system, *non_system_messages])
+        else:
+            current_system_messages = [
+                msg for msg in self.agent_loop.messages if msg.role == Role.system
+            ]
+            self.agent_loop.messages.reset(
+                current_system_messages + non_system_messages
+            )
         self._refresh_profile_widgets()
 
         self._reset_ui_state()
