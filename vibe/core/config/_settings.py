@@ -432,6 +432,11 @@ DEFAULT_PROVIDERS = [
         api_base="http://127.0.0.1:8080/v1",
         api_key_env_var="",  # NOTE: if you wish to use --api-key in llama-server, change this value
     ),
+    ProviderConfig(
+        name="deepseek",
+        api_base="https://api.deepseek.com/v1",
+        api_key_env_var="DEEPSEEK_API_KEY",
+    ),
 ]
 
 DEFAULT_MODELS = [
@@ -457,6 +462,16 @@ DEFAULT_MODELS = [
         alias="local",
         input_price=0.0,
         output_price=0.0,
+    ),
+    ModelConfig(
+        name="deepseek-chat",
+        provider="deepseek",
+        alias="deepseek",
+        temperature=1.0,
+        input_price=0.27,
+        output_price=1.10,
+        thinking="high",
+        auto_compact_threshold=1_000_000,
     ),
 ]
 

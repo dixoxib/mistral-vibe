@@ -40,11 +40,7 @@ class OpenAIAdapter(APIAdapter):
         max_tokens: int | None,
         tool_choice: StrToolChoice | AvailableTool | None,
     ) -> dict[str, Any]:
-        payload = {
-            "model": model_name,
-            "messages": converted_messages,
-            "temperature": temperature,
-        }
+        payload: dict[str, Any] = {"model": model_name, "temperature": temperature}
 
         if tools:
             payload["tools"] = [tool.model_dump(exclude_none=True) for tool in tools]
@@ -56,6 +52,8 @@ class OpenAIAdapter(APIAdapter):
             )
         if max_tokens is not None:
             payload["max_tokens"] = max_tokens
+
+        payload["messages"] = converted_messages
 
         return payload
 

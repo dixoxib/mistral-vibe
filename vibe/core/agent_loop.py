@@ -313,7 +313,6 @@ class AgentLoop:  # noqa: PLR0904
             self.config,
             self.skill_manager,
             self.agent_manager,
-            include_git_status=not defer_heavy_init,
             scratchpad_dir=self.scratchpad_dir,
             headless=self._headless,
         )

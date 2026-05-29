@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+
 import sys
 
 import pytest
@@ -142,7 +142,5 @@ def test_current_date_placeholder_substituted_in_prompt() -> None:
         tool_manager, config, skill_manager, agent_manager
     )
 
-    today = date.today()
-    expected = f"Today's date is {today.isoformat()} ({today.strftime('%A')})."
-    assert expected in prompt
     assert "$current_date" not in prompt
+    assert "Today's date is" not in prompt

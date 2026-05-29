@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date
 import html
 import os
 from pathlib import Path
@@ -139,7 +138,7 @@ class ProjectContextProvider:
         except Exception as e:
             return f"Error getting git status: {e}"
 
-    def get_full_context(self, *, include_git_status: bool = True) -> str:
+    def get_full_context(self, *, include_git_status: bool = False) -> str:
         git_status = self.get_git_status() if include_git_status else ""
 
         template = UtilityPrompt.PROJECT_CONTEXT.read()
@@ -167,11 +166,6 @@ def _get_os_system_prompt() -> str:
     if is_windows():
         prompt += "\n" + _get_windows_system_prompt()
     return prompt
-
-
-def _format_current_date() -> str:
-    today = date.today()
-    return f"{today.isoformat()} ({today.strftime('%A')})"
 
 
 def _get_windows_system_prompt() -> str:
@@ -291,7 +285,7 @@ def _resolve_system_prompt(
 
 
 def _interpolate_prompt(prompt: str) -> str:
-    return Template(prompt).safe_substitute(current_date=_format_current_date())
+    return prompt
 
 
 def _get_headless_section() -> str:
@@ -311,7 +305,7 @@ def get_universal_system_prompt(  # noqa: PLR0912
     skill_manager: SkillManager,
     agent_manager: AgentManager,
     *,
-    include_git_status: bool = True,
+    include_git_status: bool = False,
     scratchpad_dir: Path | None = None,
     headless: bool = False,
     experiment_manager: ExperimentManager | None = None,
