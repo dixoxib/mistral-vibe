@@ -625,9 +625,24 @@ class AgentLoop:  # noqa: PLR0904
 
         from vibe.core.prompts import UtilityPrompt
 
-        seam_prompt = UtilityPrompt.SEAM.read()
+        seam_template = UtilityPrompt.SEAM.read()
+        summary_request = (
+            "Summarize the conversation so far. Fill in this template "
+            "with the actual state:\n\n" + seam_template
+        )
+
+        with self.messages.silent():
+            self.messages.append(
+                LLMMessage(role=Role.user, content=summary_request)
+            )
+            result = await self._chat()
+            # Remove temporary summary_request + assistant response
+            del self.messages._data[-2:]
+
+        summary = (result.message.content or "").strip()
+        filled_seam = summary if summary else seam_template
         self.messages.append(
-            LLMMessage(role=Role.user, content=seam_prompt, injected=True)
+            LLMMessage(role=Role.user, content=filled_seam, injected=True)
         )
         self._last_seam_chars = current_chars
 

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 from vibe.core.config import ModelConfig
 from vibe.core.llm.backend.generic import SEAM_MARKER, OpenAIAdapter
 from vibe.core.types import LLMMessage, Role
@@ -49,6 +51,97 @@ class TestSeamPruning:
         cfg = ModelConfig(name="test", provider="test", alias="test")
         assert cfg.seam_interval == 200_000
         assert cfg.seam_prune_margin == 64_000
+
+
+class TestSeamInjection:
+    @pytest.mark.asyncio
+    async def test_injects_filled_seam_when_threshold_exceeded(self) -> None:
+        from tests.conftest import build_test_agent_loop
+        from tests.mock.utils import mock_llm_chunk
+        from tests.stubs.fake_backend import FakeBackend
+        from tests.test_agent_stats import make_config
+
+        summary_content = "### Active Goal\nBuild a thing"
+        backend = FakeBackend([
+            [mock_llm_chunk(content="first response")],
+            [mock_llm_chunk(content=summary_content)],
+            [mock_llm_chunk(content="after seam")],
+        ])
+
+        config = make_config(input_price=0.0, output_price=0.0)
+        config.models[0].seam_interval = 1
+        config.models[0].seam_prune_margin = 64_000
+
+        agent = build_test_agent_loop(config=config, backend=backend)
+        agent._last_seam_chars = 0
+
+        async for _ in agent.act("hello"):
+            pass
+
+        seams = [
+            m for m in agent.messages
+            if m.role == Role.user and m.injected and SEAM_MARKER in (m.content or "")
+        ]
+        assert len(seams) == 1
+        assert summary_content in seams[0].content
+
+    @pytest.mark.asyncio
+    async def test_skips_when_below_threshold(self) -> None:
+        from tests.conftest import build_test_agent_loop
+        from tests.mock.utils import mock_llm_chunk
+        from tests.stubs.fake_backend import FakeBackend
+        from tests.test_agent_stats import make_config
+
+        backend = FakeBackend([mock_llm_chunk(content="response")])
+        config = make_config(input_price=0.0, output_price=0.0)
+        config.models[0].seam_interval = 1_000_000
+        config.models[0].seam_prune_margin = 64_000
+
+        agent = build_test_agent_loop(config=config, backend=backend)
+        agent._last_seam_chars = 0
+
+        async for _ in agent.act("hello"):
+            pass
+
+        seams = [
+            m for m in agent.messages
+            if m.role == Role.user and m.injected and SEAM_MARKER in (m.content or "")
+        ]
+        assert len(seams) == 0
+
+    @pytest.mark.asyncio
+    async def test_temp_messages_removed_after_injection(self) -> None:
+        from tests.conftest import build_test_agent_loop
+        from tests.mock.utils import mock_llm_chunk
+        from tests.stubs.fake_backend import FakeBackend
+        from tests.test_agent_stats import make_config
+
+        summary_content = "### Active Goal\nTest"
+        backend = FakeBackend([
+            [mock_llm_chunk(content="first response")],
+            [mock_llm_chunk(content=summary_content)],
+            [mock_llm_chunk(content="after seam")],
+        ])
+
+        config = make_config(input_price=0.0, output_price=0.0)
+        config.models[0].seam_interval = 1
+        config.models[0].seam_prune_margin = 64_000
+
+        agent = build_test_agent_loop(config=config, backend=backend)
+        agent._last_seam_chars = 0
+
+        async for _ in agent.act("hello"):
+            pass
+
+        messages = list(agent.messages)
+        last_msg = messages[-1]
+        assert last_msg.role == Role.assistant
+        assert last_msg.content == "after seam"
+
+        second_last = messages[-2]
+        assert second_last.role == Role.user
+        assert second_last.injected
+        assert SEAM_MARKER in (second_last.content or "")
 
 
 def _prepare(
