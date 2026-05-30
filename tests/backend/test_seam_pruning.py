@@ -79,7 +79,8 @@ class TestSeamInjection:
             pass
 
         seams = [
-            m for m in agent.messages
+            m
+            for m in agent.messages
             if m.role == Role.user and m.injected and SEAM_MARKER in (m.content or "")
         ]
         assert len(seams) == 1
@@ -104,7 +105,8 @@ class TestSeamInjection:
             pass
 
         seams = [
-            m for m in agent.messages
+            m
+            for m in agent.messages
             if m.role == Role.user and m.injected and SEAM_MARKER in (m.content or "")
         ]
         assert len(seams) == 0

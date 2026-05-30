@@ -30,6 +30,7 @@ if TYPE_CHECKING:
 
 SEAM_MARKER = "## Context Seam"
 
+
 class OpenAIAdapter(APIAdapter):
     endpoint: ClassVar[str] = "/chat/completions"
 
@@ -131,8 +132,6 @@ class OpenAIAdapter(APIAdapter):
 
         return PreparedRequest(self.endpoint, headers, body)
 
-
-
     def _parse_message(
         self, data: dict[str, Any], field_name: str
     ) -> LLMMessage | None:
@@ -232,9 +231,7 @@ class GenericBackend:
         cutoff_chars = total_chars - model.seam_prune_margin * 4
 
         for seam_idx in reversed(seam_indices):
-            seam_chars = sum(
-                len(m.content or "") for m in messages[: seam_idx + 1]
-            )
+            seam_chars = sum(len(m.content or "") for m in messages[: seam_idx + 1])
             if seam_chars < cutoff_chars:
                 return seam_idx
 

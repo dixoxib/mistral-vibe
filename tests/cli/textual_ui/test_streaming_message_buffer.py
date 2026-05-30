@@ -34,6 +34,9 @@ class MessageTestDouble(StreamingMessageBase):
         self._at_bottom = at_bottom
         self._should_write = should_write
         self._fake_stream: FakeStream = FakeStream()
+        self._chat = None
+        self._write_timer = None
+        self._pending_write = ""
 
     # --- overrides used by the buffer logic ---
 
@@ -47,6 +50,12 @@ class MessageTestDouble(StreamingMessageBase):
 
     def _should_write_content(self) -> bool:
         return self._should_write
+
+    def _schedule_write(self) -> None:
+        if not self._pending_write:
+            return
+        self._fake_stream.written.append(self._pending_write)
+        self._pending_write = ""
 
 
 def make_msg(*, at_bottom: bool = True, should_write: bool = True) -> MessageTestDouble:

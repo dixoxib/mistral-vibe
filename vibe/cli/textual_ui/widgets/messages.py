@@ -193,6 +193,10 @@ class StreamingMessageBase(Static):
             await stream.write(self._to_write_buffer)
         self._to_write_buffer = ""
 
+        if self._write_timer is not None:
+            self._write_timer.stop()
+        await self._flush_pending_write()
+
         if self._stream is None:
             return
 

@@ -496,7 +496,8 @@ class VibeAcpAgentLoop(AcpAgent):
                 "browser-auth-delegated": {
                     "attemptId": attempt.process_id,
                     "expiresAt": (
-                        attempt.expires_at.astimezone(UTC)
+                        attempt.expires_at
+                        .astimezone(UTC)
                         .isoformat()
                         .replace("+00:00", "Z")
                     ),

@@ -16,6 +16,9 @@ from uuid import uuid4
 from weakref import WeakKeyDictionary
 
 from pydantic import BaseModel
+
+from vibe.cli.textual_ui._markdown_patch import _install as _install_markdown_patch
+
 from rich import print as rprint
 from textual.app import WINDOWS, App, ComposeResult
 from textual.binding import Binding, BindingType
@@ -3251,6 +3254,8 @@ def run_textual_ui(
     agent_loop: AgentLoop, startup: StartupOptions | None = None
 ) -> None:
     from vibe.cli.stderr_guard import stderr_guard
+
+    _install_markdown_patch()
 
     update_notifier = PyPIUpdateGateway(project_name="mistral-vibe")
     update_cache_repository = FileSystemUpdateCacheRepository()

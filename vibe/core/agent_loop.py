@@ -335,6 +335,7 @@ class AgentLoop:  # noqa: PLR0904
         self._is_user_prompt_call: bool = False
         self._pending_injected_messages: list[LLMMessage] = []
         self._last_seam_chars: int = 0
+        self._injecting_seam: bool = False
 
         self.experiment_manager = ExperimentManager(
             client=RemoteEvalClient.from_settings(
@@ -615,6 +616,8 @@ class AgentLoop:  # noqa: PLR0904
         self.messages.update_system_prompt(system_prompt)
 
     async def _inject_seam_if_needed(self) -> None:
+        if self._injecting_seam:
+            return
         model = self.config.get_active_model()
         if model.seam_interval <= 0:
             return
@@ -631,13 +634,17 @@ class AgentLoop:  # noqa: PLR0904
             "with the actual state:\n\n" + seam_template
         )
 
-        with self.messages.silent():
-            self.messages.append(
-                LLMMessage(role=Role.user, content=summary_request)
-            )
-            result = await self._chat()
-            # Remove temporary summary_request + assistant response
-            del self.messages._data[-2:]
+        self._injecting_seam = True
+        try:
+            with self.messages.silent():
+                self.messages.append(
+                    LLMMessage(role=Role.user, content=summary_request)
+                )
+                result = await self._chat()
+                # Remove temporary summary_request + assistant response
+                del self.messages._data[-2:]
+        finally:
+            self._injecting_seam = False
 
         summary = (result.message.content or "").strip()
         filled_seam = summary if summary else seam_template
@@ -1378,6 +1385,7 @@ class AgentLoop:  # noqa: PLR0904
 
         try:
             await self._inject_seam_if_needed()
+            await self._save_messages()
             start_time = time.perf_counter()
             result = await self.backend.complete(
                 model=active_model,
@@ -1442,6 +1450,7 @@ class AgentLoop:  # noqa: PLR0904
 
         try:
             await self._inject_seam_if_needed()
+            await self._save_messages()
             start_time = time.perf_counter()
             usage = LLMUsage()
             chunk_agg: LLMChunk | None = None
