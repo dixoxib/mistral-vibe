@@ -16,6 +16,7 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.css.query import NoMatches
 from textual.reactive import reactive
+from textual.timer import Timer
 from textual.widget import Widget
 from textual.widgets import Markdown, Static
 from textual.widgets._markdown import MarkdownStream
@@ -112,6 +113,8 @@ class TeleportUserMessage(UserMessage):
 
 
 class StreamingMessageBase(Static):
+    _DEBOUNCE_S = 0.1
+
     def __init__(self, content: str) -> None:
         super().__init__()
         self._content = content
@@ -119,6 +122,9 @@ class StreamingMessageBase(Static):
         self._stream: MarkdownStream | None = None
         self._content_initialized = False
         self._to_write_buffer = ""
+        self._chat: ChatScroll | None = None
+        self._write_timer: Timer | None = None
+        self._pending_write: str = ""
 
     def _get_markdown(self) -> Markdown:
         if self._markdown is None:
@@ -134,8 +140,9 @@ class StreamingMessageBase(Static):
 
     def _is_chat_at_bottom(self) -> bool:
         try:
-            chat = cast("ChatScroll", self.app.query_one("#chat"))
-            return chat.is_at_bottom
+            if self._chat is None:
+                self._chat = cast("ChatScroll", self.app.query_one("#chat"))
+            return self._chat.is_at_bottom
         except Exception:
             return True
 
@@ -151,12 +158,26 @@ class StreamingMessageBase(Static):
         if self._is_chat_at_bottom():
             to_write = self._to_write_buffer + content
             self._to_write_buffer = ""
-            stream = self._ensure_stream()
-            await stream.write(to_write)
+            self._pending_write += to_write
+            self._schedule_write()
+        else:
+            self._to_write_buffer += content
+
+    def _schedule_write(self) -> None:
+        if self._write_timer is not None:
             return
+        self._write_timer = self.set_timer(
+            self._DEBOUNCE_S, self._flush_pending_write
+        )
 
-        self._to_write_buffer += content
-
+    async def _flush_pending_write(self) -> None:
+        self._write_timer = None
+        if not self._pending_write:
+            return
+        to_write = self._pending_write
+        self._pending_write = ""
+        stream = self._ensure_stream()
+        await stream.write(to_write)
     async def write_initial_content(self) -> None:
         if self._content_initialized:
             return
