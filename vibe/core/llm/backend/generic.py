@@ -221,7 +221,15 @@ class GenericBackend:
         seam_indices: list[int] = []
         for i, msg in enumerate(messages):
             content = msg.content or ""
-            if msg.role == "user" and content.startswith(SEAM_MARKER):
+            is_seam_user = (
+                msg.role == "user" and content.startswith(SEAM_MARKER)
+            )
+            is_seam_assistant = (
+                msg.role == "assistant"
+                and msg.injected
+                and SEAM_MARKER in content
+            )
+            if is_seam_user or is_seam_assistant:
                 seam_indices.append(i)
 
         if not seam_indices:

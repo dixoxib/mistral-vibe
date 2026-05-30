@@ -46,6 +46,7 @@ from vibe.core.middleware import (
     CHAT_AGENT_REMINDER,
     PLAN_AGENT_EXIT,
     AutoCompactMiddleware,
+    AutoSeamMiddleware,
     ContextWarningMiddleware,
     ConversationContext,
     MiddlewareAction,
@@ -334,8 +335,7 @@ class AgentLoop:  # noqa: PLR0904
         self._current_user_message_id: str | None = None
         self._is_user_prompt_call: bool = False
         self._pending_injected_messages: list[LLMMessage] = []
-        self._last_seam_chars: int = 0
-        self._injecting_seam: bool = False
+
 
         self.experiment_manager = ExperimentManager(
             client=RemoteEvalClient.from_settings(
@@ -615,44 +615,6 @@ class AgentLoop:  # noqa: PLR0904
         )
         self.messages.update_system_prompt(system_prompt)
 
-    async def _inject_seam_if_needed(self) -> None:
-        if self._injecting_seam:
-            return
-        model = self.config.get_active_model()
-        if model.seam_interval <= 0:
-            return
-
-        current_chars = sum(len(m.content or "") for m in self.messages)
-        if current_chars - self._last_seam_chars < model.seam_interval * 4:
-            return
-
-        from vibe.core.prompts import UtilityPrompt
-
-        seam_template = UtilityPrompt.SEAM.read()
-        summary_request = (
-            "Summarize the conversation so far. Fill in this template "
-            "with the actual state:\n\n" + seam_template
-        )
-
-        self._injecting_seam = True
-        try:
-            with self.messages.silent():
-                self.messages.append(
-                    LLMMessage(role=Role.user, content=summary_request)
-                )
-                result = await self._chat()
-                # Remove temporary summary_request + assistant response
-                del self.messages._data[-2:]
-        finally:
-            self._injecting_seam = False
-
-        summary = (result.message.content or "").strip()
-        filled_seam = summary if summary else seam_template
-        self.messages.append(
-            LLMMessage(role=Role.user, content=filled_seam, injected=True)
-        )
-        self._last_seam_chars = current_chars
-
     def _select_backend(self) -> BackendLike:
         provider = self.config.get_active_provider()
         timeout = self.config.api_timeout
@@ -788,6 +750,7 @@ class AgentLoop:  # noqa: PLR0904
             self.middleware_pipeline.add(TokenLimitMiddleware(self._max_session_tokens))
 
         self.middleware_pipeline.add(AutoCompactMiddleware())
+        self.middleware_pipeline.add(AutoSeamMiddleware())
         if self.config.context_warnings:
             self.middleware_pipeline.add(ContextWarningMiddleware(0.5))
 
@@ -823,6 +786,51 @@ class AgentLoop:  # noqa: PLR0904
                     content=f"<{VIBE_STOP_EVENT_TAG}>{result.reason}</{VIBE_STOP_EVENT_TAG}>",
                     stopped_by_middleware=True,
                 )
+
+            case MiddlewareAction.SEAM:
+                current_chars = result.metadata["current_chars"]
+                from vibe.core.prompts import UtilityPrompt
+
+                seam_template = UtilityPrompt.SEAM.read()
+                seam_request = (
+                    "Summarize the conversation so far. Be thorough — use up to "
+                    "4000 tokens. Include specific file paths, command outputs, "
+                    "and decision rationales. Fill in this template "
+                    "with the actual state:\n\n" + seam_template
+                )
+
+                msg_count_before = len(self.messages)
+                seam_content = ""
+                try:
+                    with self.messages.silent():
+                        self.messages.append(
+                            LLMMessage(role=Role.user, content=seam_request)
+                        )
+                        result_chunk = await self._chat()
+                        seam_content = result_chunk.message.content or ""
+                finally:
+                    if len(self.messages) > msg_count_before:
+                        del self.messages._data[msg_count_before:]
+
+                if seam_content:
+                    self.messages.append(
+                        LLMMessage(
+                            role=Role.user,
+                            content="What have we done so far?",
+                            injected=True,
+                        )
+                    )
+                    self.messages.append(
+                        LLMMessage(
+                            role=Role.assistant,
+                            content=seam_content,
+                            injected=True,
+                        )
+                    )
+
+                for mw in self.middleware_pipeline.middlewares:
+                    if isinstance(mw, AutoSeamMiddleware):
+                        mw.record_seam(current_chars)
 
             case MiddlewareAction.INJECT_MESSAGE:
                 if result.message:
@@ -1384,7 +1392,6 @@ class AgentLoop:  # noqa: PLR0904
         )
 
         try:
-            await self._inject_seam_if_needed()
             await self._save_messages()
             start_time = time.perf_counter()
             result = await self.backend.complete(
@@ -1449,7 +1456,6 @@ class AgentLoop:  # noqa: PLR0904
         )
 
         try:
-            await self._inject_seam_if_needed()
             await self._save_messages()
             start_time = time.perf_counter()
             usage = LLMUsage()

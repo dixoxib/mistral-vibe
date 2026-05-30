@@ -372,8 +372,8 @@ class ModelConfig(BaseModel):
     cache_hit_price: float = 0.0  # Price per million input tokens (cache hit)
     thinking: ThinkingLevel = "off"
     auto_compact_threshold: int = 200_000
-    seam_interval: int = 0
-    seam_prune_margin: int = 0
+    seam_interval: int = 200_000
+    seam_prune_margin: int = 64_000
 
     _default_alias_to_name = model_validator(mode="before")(_default_alias_to_name)
 

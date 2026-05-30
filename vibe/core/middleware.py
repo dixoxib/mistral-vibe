@@ -17,6 +17,7 @@ class MiddlewareAction(StrEnum):
     CONTINUE = auto()
     STOP = auto()
     COMPACT = auto()
+    SEAM = auto()
     INJECT_MESSAGE = auto()
 
 
@@ -113,6 +114,30 @@ class AutoCompactMiddleware:
 
     def reset(self, reset_reason: ResetReason = ResetReason.STOP) -> None:
         pass
+
+
+class AutoSeamMiddleware:
+    async def before_turn(self, context: ConversationContext) -> MiddlewareResult:
+        model = context.config.get_active_model()
+        if model.seam_interval <= 0:
+            return MiddlewareResult()
+
+        current_chars = sum(len(m.content or "") for m in context.messages)
+        if current_chars - self._last_seam_chars < model.seam_interval * 4:
+            return MiddlewareResult()
+
+        return MiddlewareResult(
+            action=MiddlewareAction.SEAM,
+            metadata={"current_chars": current_chars},
+        )
+
+    def record_seam(self, current_chars: int) -> None:
+        self._last_seam_chars = current_chars
+
+    def reset(self, reset_reason: ResetReason = ResetReason.STOP) -> None:
+        pass
+
+    _last_seam_chars: int = 0
 
 
 class ContextWarningMiddleware:
@@ -255,7 +280,11 @@ class MiddlewarePipeline:
             result = await mw.before_turn(context)
             if result.action == MiddlewareAction.INJECT_MESSAGE and result.message:
                 messages_to_inject.append(result.message)
-            elif result.action in {MiddlewareAction.STOP, MiddlewareAction.COMPACT}:
+            elif result.action in {
+                MiddlewareAction.STOP,
+                MiddlewareAction.COMPACT,
+                MiddlewareAction.SEAM,
+            }:
                 return result
         if messages_to_inject:
             combined_message = "\n\n".join(messages_to_inject)

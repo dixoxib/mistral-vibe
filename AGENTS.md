@@ -89,12 +89,6 @@ Always go through `uv` — never invoke bare `python` or `pip`.
 - No docstrings on test functions, methods, or classes — descriptive names like `test_create_user_returns_403_when_unauthorized` carry the intent. Pytest displays docstrings instead of node IDs when present, which hurts.
 - Tests are exempt from the `ANN` and `PLR` ruff rules (see `per-file-ignores`).
 
-## Git
-
-- Never use `git commit --amend`, `git push --force`, or `git push --force-with-lease`.
-- Always create new commits and push with a plain `git push`.
-- If a push is rejected due to upstream changes, rebase onto the updated remote branch — never merge and never force-push.
-
 ## Editor tip
 
 In Cursor / Pyright, the "Add import" quick fix is missing — use the workspace snippets `acpschema`, `acphelpers`, `vibetypes`, `vibeconfig` to insert the import line, then rename the symbol.
