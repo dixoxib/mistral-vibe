@@ -138,7 +138,7 @@ class ProjectContextConfig(BaseSettings):
 class ExperimentsConfig(BaseSettings):
     model_config = SettingsConfigDict(extra="ignore")
 
-    enable: bool = True
+    enable: bool = False
     api_host: str = "https://experiments.mistral.services/"
     client_key: str = "sdk-OE8yJgTXZY6tj"
 
@@ -372,8 +372,8 @@ class ModelConfig(BaseModel):
     cache_hit_price: float = 0.0  # Price per million input tokens (cache hit)
     thinking: ThinkingLevel = "off"
     auto_compact_threshold: int = 200_000
-    seam_interval: int = 200_000
-    seam_prune_margin: int = 64_000
+    seam_interval: int = 0
+    seam_prune_margin: int = 0
 
     _default_alias_to_name = model_validator(mode="before")(_default_alias_to_name)
 
@@ -528,7 +528,7 @@ class VibeConfig(BaseSettings):
     active_transcribe_model: str = "voxtral-realtime"
     active_tts_model: str = "voxtral-tts"
     bypass_tool_permissions: bool = False
-    enable_telemetry: bool = True
+    enable_telemetry: bool = False
     experiment_overrides: dict[str, str] = Field(default_factory=dict)
     system_prompt_id: str = "cli"
     compaction_prompt_id: str = "compact"
@@ -536,8 +536,8 @@ class VibeConfig(BaseSettings):
     include_model_info: bool = True
     include_project_context: bool = True
     include_prompt_detail: bool = True
-    enable_update_checks: bool = True
-    enable_auto_update: bool = True
+    enable_update_checks: bool = False
+    enable_auto_update: bool = False
     enable_notifications: bool = True
     api_timeout: float = 720.0
     auto_compact_threshold: int = 200_000

@@ -49,8 +49,8 @@ class TestSeamPruning:
 
     def test_config_defaults(self) -> None:
         cfg = ModelConfig(name="test", provider="test", alias="test")
-        assert cfg.seam_interval == 200_000
-        assert cfg.seam_prune_margin == 64_000
+        assert cfg.seam_interval == 0
+        assert cfg.seam_prune_margin == 0
 
 
 class TestSeamInjection:
